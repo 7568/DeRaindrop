@@ -7,7 +7,7 @@ import torch.nn.functional as F
 import torchvision
 #Tools lib
 import numpy as np
-import cv2
+# import cv2
 import random
 import time
 import os

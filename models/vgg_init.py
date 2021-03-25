@@ -7,7 +7,7 @@ import torch.nn.functional as F
 import torchvision
 #Tools lib
 import numpy as np
-import cv2
+# import cv2
 import random
 import time
 import os
@@ -17,8 +17,8 @@ def trainable(net, trainable):
         para.requires_grad = trainable
 
 #Initialize VGG16 with pretrained weight on ImageNet
-def vgg_init():
-    vgg_model = torchvision.models.vgg16(pretrained = True).cuda()
+def vgg_init(device):
+    vgg_model = torchvision.models.vgg16(pretrained = True).to(device)
     trainable(vgg_model, False)
     return vgg_model
 

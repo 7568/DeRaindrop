@@ -7,7 +7,7 @@ import torch.nn.functional as F
 import torchvision
 #Tools lib
 import numpy as np
-import cv2
+# import cv2
 import random
 import time
 import os
@@ -153,10 +153,11 @@ class Generator(nn.Module):
             )
 
     def forward(self, input):
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
         batch_size, row, col = input.size(0), input.size(2), input.size(3)
-        mask = Variable(torch.ones(batch_size, 1, row, col)).cuda() / 2.
-        h = Variable(torch.zeros(batch_size, 32, row, col)).cuda() 
-        c = Variable(torch.zeros(batch_size, 32, row, col)).cuda()
+        mask = Variable(torch.ones(batch_size, 1, row, col)).to(device) / 2.
+        h = Variable(torch.zeros(batch_size, 32, row, col)).to(device)
+        c = Variable(torch.zeros(batch_size, 32, row, col)).to(device)
         mask_list = []
         for i in range(ITERATION):
             x = torch.cat((input, mask), 1)

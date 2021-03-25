@@ -41,7 +41,7 @@ def predict(image):
     image = image.transpose((2, 0, 1))
     image = image[np.newaxis, :, :, :]
     image = torch.from_numpy(image)
-    image = Variable(image).cuda()
+    image = Variable(image).to(device)
 
     out = model(image)[-1]
 
@@ -55,8 +55,8 @@ def predict(image):
 
 if __name__ == '__main__':
     args = get_args()
-
-    model = Generator().cuda()
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    model = Generator().to(device)
     model.load_state_dict(torch.load('./weights/gen.pkl'))
 
     if args.mode == 'demo':
