@@ -1,28 +1,24 @@
-#PyTorch lib
-import torch
+# PyTorch lib
 import torch.nn as nn
-from torch.autograd import Variable
-import torch.utils.data as Data
-import torch.nn.functional as F
 import torchvision
-#Tools lib
-import numpy as np
+
+
+# Tools lib
 # import cv2
-import random
-import time
-import os
 
 def trainable(net, trainable):
     for para in net.parameters():
         para.requires_grad = trainable
 
-#Initialize VGG16 with pretrained weight on ImageNet
+
+# Initialize VGG16 with pretrained weight on ImageNet
 def vgg_init(device):
-    vgg_model = torchvision.models.vgg16(pretrained = True).to(device)
+    vgg_model = torchvision.models.vgg16(pretrained=True).to(device)
     trainable(vgg_model, False)
     return vgg_model
 
-#Extract features from internal layers for perceptual loss
+
+# Extract features from internal layers for perceptual loss
 class vgg(nn.Module):
     def __init__(self, vgg_model):
         super(vgg, self).__init__()

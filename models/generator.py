@@ -1,156 +1,152 @@
-#PyTorch lib
+# PyTorch lib
 import torch
 import torch.nn as nn
-from torch.autograd import Variable
-import torch.utils.data as Data
 import torch.nn.functional as F
-import torchvision
-#Tools lib
-import numpy as np
-# import cv2
-import random
-import time
-import os
+from torch.autograd import Variable
 
-#Set iteration time
+# Tools lib
+# import cv2
+
+# Set iteration time
 ITERATION = 4
 
-#Model
+
+# Model
 class Generator(nn.Module):
     def __init__(self):
         super(Generator, self).__init__()
         self.det_conv0 = nn.Sequential(
             nn.Conv2d(4, 32, 3, 1, 1),
             nn.ReLU()
-            )
+        )
         self.det_conv1 = nn.Sequential(
             nn.Conv2d(32, 32, 3, 1, 1),
             nn.ReLU(),
             nn.Conv2d(32, 32, 3, 1, 1),
             nn.ReLU()
-            )
+        )
         self.det_conv2 = nn.Sequential(
             nn.Conv2d(32, 32, 3, 1, 1),
             nn.ReLU(),
             nn.Conv2d(32, 32, 3, 1, 1),
             nn.ReLU()
-            )
+        )
         self.det_conv3 = nn.Sequential(
             nn.Conv2d(32, 32, 3, 1, 1),
             nn.ReLU(),
             nn.Conv2d(32, 32, 3, 1, 1),
             nn.ReLU()
-            )
+        )
         self.det_conv4 = nn.Sequential(
             nn.Conv2d(32, 32, 3, 1, 1),
             nn.ReLU(),
             nn.Conv2d(32, 32, 3, 1, 1),
             nn.ReLU()
-            )
+        )
         self.det_conv5 = nn.Sequential(
             nn.Conv2d(32, 32, 3, 1, 1),
             nn.ReLU(),
             nn.Conv2d(32, 32, 3, 1, 1),
             nn.ReLU()
-            )
+        )
         self.conv_i = nn.Sequential(
             nn.Conv2d(32 + 32, 32, 3, 1, 1),
             nn.Sigmoid()
-            )
+        )
         self.conv_f = nn.Sequential(
             nn.Conv2d(32 + 32, 32, 3, 1, 1),
             nn.Sigmoid()
-            )
+        )
         self.conv_g = nn.Sequential(
             nn.Conv2d(32 + 32, 32, 3, 1, 1),
             nn.Tanh()
-            )
+        )
         self.conv_o = nn.Sequential(
             nn.Conv2d(32 + 32, 32, 3, 1, 1),
             nn.Sigmoid()
-            )
+        )
         self.det_conv_mask = nn.Sequential(
             nn.Conv2d(32, 1, 3, 1, 1),
-            )
+        )
         self.conv1 = nn.Sequential(
             nn.Conv2d(4, 64, 5, 1, 2),
             nn.ReLU()
-            )
+        )
         self.conv2 = nn.Sequential(
             nn.Conv2d(64, 128, 3, 2, 1),
             nn.ReLU()
-            )
+        )
         self.conv3 = nn.Sequential(
             nn.Conv2d(128, 128, 3, 1, 1),
             nn.ReLU()
-            )
+        )
         self.conv4 = nn.Sequential(
             nn.Conv2d(128, 256, 3, 2, 1),
             nn.ReLU()
-            )
+        )
         self.conv5 = nn.Sequential(
             nn.Conv2d(256, 256, 3, 1, 1),
             nn.ReLU()
-            )
+        )
         self.conv6 = nn.Sequential(
             nn.Conv2d(256, 256, 3, 1, 1),
             nn.ReLU()
-            )
+        )
         self.diconv1 = nn.Sequential(
-            nn.Conv2d(256, 256, 3, 1, 2, dilation = 2),
+            nn.Conv2d(256, 256, 3, 1, 2, dilation=2),
             nn.ReLU()
-            )
+        )
         self.diconv2 = nn.Sequential(
-            nn.Conv2d(256, 256, 3, 1, 4, dilation = 4),
+            nn.Conv2d(256, 256, 3, 1, 4, dilation=4),
             nn.ReLU()
-            )
+        )
         self.diconv3 = nn.Sequential(
-            nn.Conv2d(256, 256, 3, 1, 8, dilation = 8),
+            nn.Conv2d(256, 256, 3, 1, 8, dilation=8),
             nn.ReLU()
-            )
+        )
         self.diconv4 = nn.Sequential(
-            nn.Conv2d(256, 256, 3, 1, 16, dilation = 16),
+            nn.Conv2d(256, 256, 3, 1, 16, dilation=16),
             nn.ReLU()
-            )
+        )
         self.conv7 = nn.Sequential(
             nn.Conv2d(256, 256, 3, 1, 1),
             nn.ReLU()
-            )
+        )
         self.conv8 = nn.Sequential(
             nn.Conv2d(256, 256, 3, 1, 1),
             nn.ReLU()
-            )
+        )
         self.deconv1 = nn.Sequential(
             nn.ConvTranspose2d(256, 128, 4, 2, 1),
             nn.ReflectionPad2d((1, 0, 1, 0)),
-            nn.AvgPool2d(2, stride = 1),
+            nn.AvgPool2d(2, stride=1),
             nn.ReLU()
-            )
+        )
         self.conv9 = nn.Sequential(
             nn.Conv2d(128, 128, 3, 1, 1),
             nn.ReLU()
-            )
+        )
         self.deconv2 = nn.Sequential(
             nn.ConvTranspose2d(128, 64, 4, 2, 1),
             nn.ReflectionPad2d((1, 0, 1, 0)),
-            nn.AvgPool2d(2, stride = 1),
+            nn.AvgPool2d(2, stride=1),
             nn.ReLU()
-            )
+        )
         self.conv10 = nn.Sequential(
             nn.Conv2d(64, 32, 3, 1, 1),
             nn.ReLU()
-            )
+        )
         self.outframe1 = nn.Sequential(
             nn.Conv2d(256, 3, 3, 1, 1),
             nn.ReLU()
-            )
+        )
         self.outframe2 = nn.Sequential(
             nn.Conv2d(128, 3, 3, 1, 1),
             nn.ReLU()
-            )
+        )
         self.output = nn.Sequential(
             nn.Conv2d(32, 3, 3, 1, 1)
-            )
+        )
 
     def forward(self, input):
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
