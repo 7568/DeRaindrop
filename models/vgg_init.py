@@ -1,6 +1,7 @@
 # PyTorch lib
 import torch.nn as nn
 import torchvision
+import torch
 
 
 # Tools lib
@@ -12,16 +13,19 @@ def trainable(net, trainable):
 
 
 # Initialize VGG16 with pretrained weight on ImageNet
-def vgg_init(device):
-    vgg_model = torchvision.models.vgg16(pretrained=True).to(device)
+def vgg_init(device, model_weights):
+    vgg_model = torchvision.models.vgg16()
+    vgg_model.load_state_dict(torch.load(model_weights))
+    # vgg_model = vgg_model.classifier[:-1]
+    vgg_model.eval()
     trainable(vgg_model, False)
     return vgg_model
 
 
 # Extract features from internal layers for perceptual loss
-class vgg(nn.Module):
+class Vgg(nn.Module):
     def __init__(self, vgg_model):
-        super(vgg, self).__init__()
+        super(Vgg, self).__init__()
         self.vgg_layers = vgg_model.features
         self.layer_name_mapping = {
             '1': "relu1_1",

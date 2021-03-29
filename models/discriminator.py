@@ -1,5 +1,6 @@
 #PyTorch lib
 import torch.nn as nn
+import torch as torch
 
 
 #Tools lib

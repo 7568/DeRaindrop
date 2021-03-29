@@ -1,14 +1,15 @@
 # PyTorch lib
-import torch
+import torch as torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
+
 
 # Tools lib
 # import cv2
 
 # Set iteration time
-ITERATION = 4
+# ITERATION = 4
 
 
 # Model
@@ -148,33 +149,35 @@ class Generator(nn.Module):
             nn.Conv2d(32, 3, 3, 1, 1)
         )
 
-    def forward(self, input):
+    def forward(self, input, times_in_attention):
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
         batch_size, row, col = input.size(0), input.size(2), input.size(3)
         mask = Variable(torch.ones(batch_size, 1, row, col)).to(device) / 2.
         h = Variable(torch.zeros(batch_size, 32, row, col)).to(device)
         c = Variable(torch.zeros(batch_size, 32, row, col)).to(device)
         mask_list = []
-        for i in range(ITERATION):
+        attention_map = []
+        for i in range(times_in_attention):
             x = torch.cat((input, mask), 1)
             x = self.det_conv0(x)
-            resx = x
-            x = F.relu(self.det_conv1(x) + resx)
-            resx = x
-            x = F.relu(self.det_conv2(x) + resx)
-            resx = x
-            x = F.relu(self.det_conv3(x) + resx)
-            resx = x
-            x = F.relu(self.det_conv4(x) + resx)
-            resx = x
-            x = F.relu(self.det_conv5(x) + resx)
+            # resx = x
+            x = F.relu(self.det_conv1(x) + x)
+            # resx = x
+            x = F.relu(self.det_conv2(x) + x)
+            # resx = x
+            x = F.relu(self.det_conv3(x) + x)
+            # resx = x
+            x = F.relu(self.det_conv4(x) + x)
+            # resx = x
+            x = F.relu(self.det_conv5(x) + x)
             x = torch.cat((x, h), 1)
+            attention_map.append(x)
             i = self.conv_i(x)
             f = self.conv_f(x)
             g = self.conv_g(x)
             o = self.conv_o(x)
             c = f * c + i * g
-            h = o * F.tanh(c)
+            h = o * torch.tanh(c)
             mask = self.det_conv_mask(h)
             mask_list.append(mask)
         x = torch.cat((input, mask), 1)
@@ -201,4 +204,4 @@ class Generator(nn.Module):
         x = x + res1
         x = self.conv10(x)
         x = self.output(x)
-        return mask_list, frame1, frame2, x
+        return mask_list, frame1, frame2, attention_map, x
