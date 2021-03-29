@@ -42,21 +42,29 @@ def align_to_four(img):
     return img
 
 
-def do_generator(image, times_in_attention):
+# def do_generator(image, times_in_attention):
+#     image = np.array(image, dtype='float32') / 255.
+#     image = image.transpose((2, 0, 1))
+#     image = image[np.newaxis, :, :, :]
+#     image = torch.from_numpy(image)
+#     image = Variable(image).to(device)
+#
+#     out_tensor = generator(image, times_in_attention)[-1]
+#     out_array = out_tensor
+#     out_array = out_array.cpu().data
+#     out_array = out_array.numpy()
+#     out_array = out_array.transpose((0, 2, 3, 1))
+#     out_array = out_array[0, :, :, :] * 255.
+#
+#     return out_tensor,out_array
+
+def prepare_img_to_tensor(image):
     image = np.array(image, dtype='float32') / 255.
     image = image.transpose((2, 0, 1))
     image = image[np.newaxis, :, :, :]
     image = torch.from_numpy(image)
     image = Variable(image).to(device)
-
-    out = generator(image, times_in_attention)[-1]
-
-    out = out.cpu().data
-    out = out.numpy()
-    out = out.transpose((0, 2, 3, 1))
-    out = out[0, :, :, :] * 255.
-
-    return out
+    return image
 
 
 def do_discriminator(input):
@@ -76,25 +84,35 @@ def loss_generator(generator_results, back_ground_truth):
     :return:
     """
 
+    mseloss = nn.MSELoss()
     # 计算公式4
     l_att_a_m = 0
     for i in range(len(generator_results[0])):
         _attention = generator_results[0]
         _mask = _attention[i]
-        _a_t = generator_results[1][i]
-        l_att_a_m += math.pow(sida_in_attention, len(_attention) - i) * sk_metrics.mean_squared_error(_mask, _a_t)
+        _a_t = generator_results[3][i]
+        l_att_a_m += math.pow(sida_in_attention, len(_attention) - i - 1) * mseloss(_mask, _a_t)
 
     # 计算公式6
-    generator_output = generator_results[4]
-    vgg_to_gt = vgg16(torch.tensor(back_ground_truth))
-    vgg_to_gen = vgg16(torch.tensor(generator_output))
-    lp_o_t = sk_metrics.mean_squared_error(vgg_to_gt, vgg_to_gen)
+    # generator_output = generator_results_array[4]
+    lp_o_t = 0
+    # loss2 = nn.MSELoss()
+    vgg_to_gen = vgg16(generator_results[4])
+    vgg_to_gt = vgg16(prepare_img_to_tensor(back_ground_truth))
+    for i in range(len(vgg_to_gen)):
+        lp_o_t += mseloss(vgg_to_gen[i], vgg_to_gt[i])
 
     # 计算公式5
-    _s = torch.tensor([generator_results[1], generator_results[2], generator_results[3]])
-    _t = torch.tensor([resize_image(back_ground_truth, 0.25), resize_image(back_ground_truth, 0.5), back_ground_truth])
+    # loss3 = nn.MSELoss()
+    _s = [generator_results[1], generator_results[2], generator_results[4]]
+    _t = [prepare_img_to_tensor(resize_image(back_ground_truth, 0.25)),
+          prepare_img_to_tensor(resize_image(back_ground_truth, 0.5)), prepare_img_to_tensor(back_ground_truth)]
     _lamda = lamda_in_autoencoder
-    lm_s_t = torch.sum(_lamda * _s * _t)
+    lm_s_t = 0
+    for i in range(len(_s)):
+        lm_s_t += _lamda[i] * mseloss(_s[i], _t[i])
+
+    # lm_s_t = torch.sum(_lamda * nn.MSELoss(_s, _t))
 
     # 计算公式7
     # LGAN(O) = log(1 - D(G(I)))
@@ -122,8 +140,14 @@ def resize_image(image, scale_coefficient):
     return output
 
 
-def loss_adversarial(adver_out, back_gt):
-    return nn.BCELoss(adver_out, back_gt) * 0.01
+def loss_adversarial(result, d1, back_gt):
+    mseloss = nn.MSELoss()
+    d2 = discriminator(prepare_img_to_tensor(back_gt))
+    zeros = Variable(torch.zeros(d2[0].size(0), d2[0].size(1), d2[0].size(2), d2[0].size(3))).to(device)
+    l_o_r_an = mseloss(d1[0], result[3][3]) + mseloss(d2[0], zeros)
+    ones = Variable(torch.ones(d1[1].size(0))).to(device)
+    loss2 = -torch.log(d2[1][0])[0] - torch.log(ones - d1[1][0])[0] + discriminative_loss_r * l_o_r_an
+    return loss2
 
 
 # custom weights initialization called on netG and netD
@@ -165,14 +189,22 @@ def train():
             # the output attention map at time step t, orAt, and the binary
             # mask, M.
             optimizer_g.zero_grad()
-            result = do_generator(img, times_in_attention)
+            img_tensor = prepare_img_to_tensor(img)
+            result = generator(img_tensor, times_in_attention)
             loss1 = loss_generator(result, gt)
+            d1 = discriminator(result[4])
+            ones = Variable(torch.ones(d1[1].size(0))).to(device)
+            loss1 += torch.log(ones - d1[1][0])[0]
             # Backpropagation
             loss1.backward()
             optimizer_g.step()
 
             optimizer_d.zero_grad()
-            loss2 = loss_adversarial(discriminator(result[4]), gt)
+            # d1 = discriminator(result[4])
+            # torch.log(1 - d1)
+            result2 = generator(img_tensor, times_in_attention)
+            dd1 = discriminator(result[4])
+            loss2 = loss_adversarial(result2, dd1, gt)
             # Backpropagation
             loss2.backward()
             optimizer_d.step()
@@ -204,5 +236,6 @@ if __name__ == '__main__':
     sida_in_attention = 0.8  # attention中的参数sida
     times_in_attention = 4  # attention中提取M的次数
     lamda_in_autoencoder = [0.6, 0.8, 1.0]
+    discriminative_loss_r = 0.05
 
     train()

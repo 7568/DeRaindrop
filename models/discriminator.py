@@ -46,7 +46,8 @@ class Discriminator(nn.Module):
             nn.ReLU()
             )
         self.fc = nn.Sequential(
-            nn.Linear(32 * 14 * 14, 1024),
+            nn.Linear(32 * 30 * 45, 1024),
+            # nn.Linear(32, 1024),
             nn.Linear(1024, 1),
             nn.Sigmoid()
             )
@@ -60,7 +61,8 @@ class Discriminator(nn.Module):
         x = self.conv6(x)
         mask = self.conv_mask(x)
         x = self.conv7(x * mask)
-        x = self.conv7(x)
+        # x = self.conv7(x)
         x = self.conv8(x)
         x = x.view(x.size(0), -1)
-        return mask, self.fc(x)
+        x = self.fc(x)
+        return mask, x
