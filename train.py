@@ -16,6 +16,7 @@ import torch.functional as nn
 # Models lib
 # Metrics lib
 from models import *
+import time
 
 
 def get_args():
@@ -149,17 +150,25 @@ def get_binary_mask(img, back_gt):
     _diff[_diff <= 36] = 0
     _diff[_diff > 36] = 1
     # torch.from_numpy(_diff zeng)
-    _diff = _diff[np.newaxis,np.newaxis, :, :]
+    _diff = _diff[np.newaxis, np.newaxis, :, :]
     return torch.from_numpy(_diff)
 
 
-def loss_adversarial(result, d1, back_gt):
+def loss_adversarial(result, back_gt):
+    """
+    (8)
+    :param result: generator output
+    :param d_o: O = G(I) G:generator I:image with raindrop  d_o : D(O)
+    :param back_gt:
+    :return:
+    """
     mseloss = nn.MSELoss()
-    d2 = discriminator(prepare_img_to_tensor(back_gt))
-    zeros = torch.zeros(d2[0].size(0), d2[0].size(1), d2[0].size(2), d2[0].size(3)).to(device)
-    l_o_r_an = mseloss(d1[0], result[3][3]) + mseloss(d2[0], zeros)
-    ones = torch.ones(d1[1].size(0)).to(device)
-    loss2 = -torch.log(d2[1][0])[0] - torch.log(ones - d1[1][0])[0] + discriminative_loss_r * l_o_r_an
+    d_o = discriminator(result[4])
+    d_r = discriminator(prepare_img_to_tensor(back_gt))
+    zeros = torch.zeros(d_r[0].size(0), d_r[0].size(1), d_r[0].size(2), d_r[0].size(3)).to(device)
+    l_o_r_an = mseloss(d_o[0], result[0][3]) + mseloss(d_r[0], zeros)
+    ones = torch.ones(d_o[1].size(0)).to(device)
+    loss2 = -torch.log(d_r[1][0])[0] - torch.log(ones - d_o[1][0])[0] + discriminative_loss_r * l_o_r_an
     return loss2
 
 
@@ -189,12 +198,18 @@ def train():
     for _e in range(epoch):
         for _i in range(num):  # 默认一个iteration只有一张图片
             print('Processing image: %s' % (input_list[_i]))
+            _start = time.time()
             generator.zero_grad()
             img = cv2.imread(args.input_dir + input_list[_i])
             gt = cv2.imread(args.gt_dir + gt_list[_i])
+
+            # resize image
+            dsize = (360, 240)
+            img = cv2.resize(img, dsize)
+            gt = cv2.resize(gt, dsize)
             binary_mask = get_binary_mask(img, gt)
-            img = align_to_four(img)
-            gt = align_to_four(gt)
+            # img = align_to_four(img)
+            # gt = align_to_four(gt)
             img_tensor = prepare_img_to_tensor(img)
 
             optimizer_g.zero_grad()
@@ -211,11 +226,16 @@ def train():
             # d1 = discriminator(result[4])
             # torch.log(1 - d1)
             result2 = generator(img_tensor, times_in_attention)
-            dd1 = discriminator(result2[4])
-            loss2 = loss_adversarial(result2, dd1, gt)
+
+            loss2 = loss_adversarial(result2, gt)
             # Backpropagation
             loss2.backward()
             optimizer_d.step()
+            print(time.time() - _start)
+
+    torch.save(generator, '/home/louis/Documents/git/DeRaindrop/models/generator.pth')
+    torch.save(discriminator, '/home/louis/Documents/git/DeRaindrop/models/discriminator.pth')
+
 
             # result = np.array(result, dtype='uint8')
             # cur_psnr = calc_psnr(result, gt)
@@ -229,8 +249,8 @@ def train():
 
 if __name__ == '__main__':
     args = get_args()
-    args.input_dir = '/home/louis/Documents/git/DeRaindrop/demo/input/'  # 带雨滴的图片的路径
-    args.gt_dir = '/home/louis/Documents/git/DeRaindrop/demo/output/'  # 干净的图片的路径
+    args.input_dir = '/home/louis/Documents/git/DeRaindrop/data/train/rain_image/'  # 带雨滴的图片的路径
+    args.gt_dir = '/home/louis/Documents/git/DeRaindrop/data/train/clean_image/'  # 干净的图片的路径
     model_weights = '/home/louis/Documents/git/DeRaindrop/models/vgg16-397923af.pth'
     # device = 'cuda' if torch.cuda.is_available() else 'cpu'
     device = 'cpu'
