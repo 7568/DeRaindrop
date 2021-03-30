@@ -5,19 +5,16 @@ Description:
 """
 # PyTorch lib
 import argparse
+import math
 import os
 
 import cv2
 # Tools lib
 import numpy as np
-import torch
 import torch.functional as nn
-
-import math
 
 # Models lib
 # Metrics lib
-from metrics import calc_psnr, calc_ssim
 from models import *
 
 
@@ -87,10 +84,10 @@ def loss_generator(generator_results, back_ground_truth, binary_mask):
     mseloss = nn.MSELoss()
     # 计算公式4
     l_att_a_m = 0
-    for i in range(len(generator_results[0])):
-        _attention = generator_results[0]
-        _a_t = generator_results[3][i]
-        l_att_a_m += math.pow(sida_in_attention, len(_attention) - i - 1) * mseloss(binary_mask, _a_t)
+    _attention = generator_results[0]
+    for i in range(len(_attention)):
+        _pow = torch.tensor(math.pow(sida_in_attention, len(_attention) - i - 1))
+        l_att_a_m += _pow * mseloss(binary_mask, _attention[i])
 
     # 计算公式6
     # generator_output = generator_results_array[4]
@@ -146,12 +143,14 @@ def get_binary_mask(img, back_gt):
     :param back_gt: 干净的背景图片
     :return:
     """
-    _mean_image = np.mean(img, 1)
-    _mean_back_gt = np.mean(back_gt, 1)
+    _mean_image = np.mean(img, 2)
+    _mean_back_gt = np.mean(back_gt, 2)
     _diff = np.abs(_mean_image - _mean_back_gt)
     _diff[_diff <= 36] = 0
     _diff[_diff > 36] = 1
-    return _diff
+    # torch.from_numpy(_diff zeng)
+    _diff = _diff[np.newaxis,np.newaxis, :, :]
+    return torch.from_numpy(_diff)
 
 
 def loss_adversarial(result, d1, back_gt):
@@ -196,8 +195,8 @@ def train():
             binary_mask = get_binary_mask(img, gt)
             img = align_to_four(img)
             gt = align_to_four(gt)
-
             img_tensor = prepare_img_to_tensor(img)
+
             optimizer_g.zero_grad()
             result = generator(img_tensor, times_in_attention)
             loss1 = loss_generator(result, gt, binary_mask)
