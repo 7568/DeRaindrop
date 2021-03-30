@@ -150,7 +150,8 @@ class Generator(nn.Module):
         )
 
     def forward(self, input, times_in_attention):
-        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        # device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        device ='cpu'
         batch_size, row, col = input.size(0), input.size(2), input.size(3)
         mask = Variable(torch.ones(batch_size, 1, row, col)).to(device) / 2.
         h = Variable(torch.zeros(batch_size, 32, row, col)).to(device)

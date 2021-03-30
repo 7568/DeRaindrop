@@ -12,14 +12,13 @@ import cv2
 import numpy as np
 import torch
 import torch.functional as nn
-from torch.autograd import Variable
+
 import math
 
 # Models lib
 # Metrics lib
 from metrics import calc_psnr, calc_ssim
 from models import *
-import sklearn.metrics as sk_metrics
 
 
 def get_args():
@@ -63,7 +62,7 @@ def prepare_img_to_tensor(image):
     image = image.transpose((2, 0, 1))
     image = image[np.newaxis, :, :, :]
     image = torch.from_numpy(image)
-    image = Variable(image).to(device)
+    image = image.to(device)
     return image
 
 
@@ -158,9 +157,9 @@ def get_binary_mask(img, back_gt):
 def loss_adversarial(result, d1, back_gt):
     mseloss = nn.MSELoss()
     d2 = discriminator(prepare_img_to_tensor(back_gt))
-    zeros = Variable(torch.zeros(d2[0].size(0), d2[0].size(1), d2[0].size(2), d2[0].size(3))).to(device)
+    zeros = torch.zeros(d2[0].size(0), d2[0].size(1), d2[0].size(2), d2[0].size(3)).to(device)
     l_o_r_an = mseloss(d1[0], result[3][3]) + mseloss(d2[0], zeros)
-    ones = Variable(torch.ones(d1[1].size(0))).to(device)
+    ones = torch.ones(d1[1].size(0)).to(device)
     loss2 = -torch.log(d2[1][0])[0] - torch.log(ones - d1[1][0])[0] + discriminative_loss_r * l_o_r_an
     return loss2
 
@@ -198,18 +197,12 @@ def train():
             img = align_to_four(img)
             gt = align_to_four(gt)
 
-            # 计算生成网络的损失
-            # 生成网络的loss包括
-            # 1 . The loss function in each recurrent
-            # block is defined as the mean squared error (MSE) between
-            # the output attention map at time step t, orAt, and the binary
-            # mask, M.
-            optimizer_g.zero_grad()
             img_tensor = prepare_img_to_tensor(img)
+            optimizer_g.zero_grad()
             result = generator(img_tensor, times_in_attention)
             loss1 = loss_generator(result, gt, binary_mask)
             d1 = discriminator(result[4])
-            ones = Variable(torch.ones(d1[1].size(0))).to(device)
+            ones = torch.ones(d1[1].size(0)).to(device)
             loss1 += torch.log(ones - d1[1][0])[0]
             # Backpropagation
             loss1.backward()
@@ -219,7 +212,7 @@ def train():
             # d1 = discriminator(result[4])
             # torch.log(1 - d1)
             result2 = generator(img_tensor, times_in_attention)
-            dd1 = discriminator(result[4])
+            dd1 = discriminator(result2[4])
             loss2 = loss_adversarial(result2, dd1, gt)
             # Backpropagation
             loss2.backward()
@@ -237,10 +230,11 @@ def train():
 
 if __name__ == '__main__':
     args = get_args()
-    args.input_dir = '/Users/louis/Documents/git/DeRaindrop/demo/input/'  # 带雨滴的图片的路径
-    args.gt_dir = '/Users/louis/Documents/git/DeRaindrop/demo/output/'  # 干净的图片的路径
-    model_weights = '/Users/louis/Documents/git/DeRaindrop/models/vgg16-397923af.pth'
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    args.input_dir = '/home/louis/Documents/git/DeRaindrop/demo/input/'  # 带雨滴的图片的路径
+    args.gt_dir = '/home/louis/Documents/git/DeRaindrop/demo/output/'  # 干净的图片的路径
+    model_weights = '/home/louis/Documents/git/DeRaindrop/models/vgg16-397923af.pth'
+    # device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    device = 'cpu'
     generator = Generator().to(device)
     discriminator = Discriminator().to(device)
     vgg16 = Vgg(vgg_init(device, model_weights))
