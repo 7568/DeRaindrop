@@ -76,11 +76,12 @@ def do_discriminator(input):
     return out
 
 
-def loss_generator(generator_results, back_ground_truth):
+def loss_generator(generator_results, back_ground_truth, binary_mask):
     """
 
     :param generator_results: 生成网络中返回的结果，包括Attention中每一步的M，attention_map,frame1, frame2, 和最终的输出x
     :param back_ground_truth: 干净的背景图片
+    :param binary_mask: 原始图片-干净的背景图片，然后取绝对值，再遍历每个元素，大于36的为1，否则为0
     :return:
     """
 
@@ -89,9 +90,8 @@ def loss_generator(generator_results, back_ground_truth):
     l_att_a_m = 0
     for i in range(len(generator_results[0])):
         _attention = generator_results[0]
-        _mask = _attention[i]
         _a_t = generator_results[3][i]
-        l_att_a_m += math.pow(sida_in_attention, len(_attention) - i - 1) * mseloss(_mask, _a_t)
+        l_att_a_m += math.pow(sida_in_attention, len(_attention) - i - 1) * mseloss(binary_mask, _a_t)
 
     # 计算公式6
     # generator_output = generator_results_array[4]
@@ -140,6 +140,15 @@ def resize_image(image, scale_coefficient):
     return output
 
 
+def get_binary_mask(img, back_gt):
+    _mean_image = np.mean(img, 1)
+    _mean_back_gt = np.mean(back_gt, 1)
+    _diff = np.abs(_mean_image - _mean_back_gt)
+    _diff[_diff <= 36] = 0
+    _diff[_diff > 36] = 1
+    return _diff
+
+
 def loss_adversarial(result, d1, back_gt):
     mseloss = nn.MSELoss()
     d2 = discriminator(prepare_img_to_tensor(back_gt))
@@ -179,6 +188,7 @@ def train():
             generator.zero_grad()
             img = cv2.imread(args.input_dir + input_list[_i])
             gt = cv2.imread(args.gt_dir + gt_list[_i])
+            binary_mask = get_binary_mask(img, gt)
             img = align_to_four(img)
             gt = align_to_four(gt)
 
@@ -191,7 +201,7 @@ def train():
             optimizer_g.zero_grad()
             img_tensor = prepare_img_to_tensor(img)
             result = generator(img_tensor, times_in_attention)
-            loss1 = loss_generator(result, gt)
+            loss1 = loss_generator(result, gt, binary_mask)
             d1 = discriminator(result[4])
             ones = Variable(torch.ones(d1[1].size(0))).to(device)
             loss1 += torch.log(ones - d1[1][0])[0]
