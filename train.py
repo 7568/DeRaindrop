@@ -141,6 +141,12 @@ def resize_image(image, scale_coefficient):
 
 
 def get_binary_mask(img, back_gt):
+    """
+    获得公式中的M
+    :param img: 带有雨滴的图片
+    :param back_gt: 干净的背景图片
+    :return:
+    """
     _mean_image = np.mean(img, 1)
     _mean_back_gt = np.mean(back_gt, 1)
     _diff = np.abs(_mean_image - _mean_back_gt)
