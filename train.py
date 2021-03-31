@@ -261,8 +261,8 @@ if __name__ == '__main__':
     vgg16 = Vgg(vgg_init(device, model_weights))
 
     print(vgg16)
-    epoch = 10
-    learning_rate = 0.001
+    epoch = 100
+    learning_rate = 0.0002
     beta1 = 0.5
     sida_in_attention = 0.8  # attention中的参数sida
     times_in_attention = 4  # attention中提取M的次数
