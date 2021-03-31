@@ -87,7 +87,7 @@ def loss_generator(generator_results, back_ground_truth, binary_mask):
     l_att_a_m = 0
     _attention = generator_results[0]
     for i in range(len(_attention)):
-        _pow = torch.tensor(math.pow(sida_in_attention, len(_attention) - i - 1))
+        _pow = torch.tensor(math.pow(sida_in_attention, len(_attention) - i - 1)).to(device)
         l_att_a_m += _pow * mseloss(binary_mask, _attention[i])
 
     # 计算公式6
@@ -151,7 +151,7 @@ def get_binary_mask(img, back_gt):
     _diff[_diff > 36] = 1
     # torch.from_numpy(_diff zeng)
     _diff = _diff[np.newaxis, np.newaxis, :, :]
-    return torch.from_numpy(_diff)
+    return torch.from_numpy(_diff).to(device)
 
 
 def loss_adversarial(result, back_gt):
@@ -197,6 +197,7 @@ def train():
 
     for _e in range(epoch):
         for _i in range(num):  # 默认一个iteration只有一张图片
+            print('_i = ',_i)
             print('Processing image: %s' % (input_list[_i]))
             _start = time.time()
             generator.zero_grad()
@@ -213,7 +214,7 @@ def train():
             img_tensor = prepare_img_to_tensor(img)
 
             optimizer_g.zero_grad()
-            result = generator(img_tensor, times_in_attention)
+            result = generator(img_tensor, times_in_attention,device)
             loss1 = loss_generator(result, gt, binary_mask)
             d1 = discriminator(result[4])
             ones = torch.ones(d1[1].size(0)).to(device)
@@ -225,7 +226,7 @@ def train():
             optimizer_d.zero_grad()
             # d1 = discriminator(result[4])
             # torch.log(1 - d1)
-            result2 = generator(img_tensor, times_in_attention)
+            result2 = generator(img_tensor, times_in_attention,device)
 
             loss2 = loss_adversarial(result2, gt)
             # Backpropagation
@@ -233,8 +234,9 @@ def train():
             optimizer_d.step()
             print(time.time() - _start)
 
-    torch.save(generator, '/home/louis/Documents/git/DeRaindrop/models/generator.pth')
-    torch.save(discriminator, '/home/louis/Documents/git/DeRaindrop/models/discriminator.pth')
+    print("======finish!==========")
+    torch.save({'state_dict': generator.state_dict()}, f'/home/louis/Documents/git/DeRaindrop/models/generator_{time.time()}.pth.tar')
+    torch.save({'state_dict': discriminator.state_dict()}, f'/home/louis/Documents/git/DeRaindrop/models/discriminator_{time.time()}.pth.tar')
 
 
             # result = np.array(result, dtype='uint8')
@@ -252,14 +254,14 @@ if __name__ == '__main__':
     args.input_dir = '/home/louis/Documents/git/DeRaindrop/data/train/rain_image/'  # 带雨滴的图片的路径
     args.gt_dir = '/home/louis/Documents/git/DeRaindrop/data/train/clean_image/'  # 干净的图片的路径
     model_weights = '/home/louis/Documents/git/DeRaindrop/models/vgg16-397923af.pth'
-    # device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    device = 'cpu'
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    # device = 'cpu'
     generator = Generator().to(device)
     discriminator = Discriminator().to(device)
     vgg16 = Vgg(vgg_init(device, model_weights))
 
     print(vgg16)
-    epoch = 1
+    epoch = 10
     learning_rate = 0.001
     beta1 = 0.5
     sida_in_attention = 0.8  # attention中的参数sida

@@ -16,6 +16,7 @@ def trainable(net, trainable):
 def vgg_init(device, model_weights):
     vgg_model = torchvision.models.vgg16()
     vgg_model.load_state_dict(torch.load(model_weights))
+    vgg_model.to(device)
     # vgg_model = vgg_model.classifier[:-1]
     vgg_model.eval()
     trainable(vgg_model, False)
