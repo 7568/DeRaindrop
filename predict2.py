@@ -30,7 +30,7 @@ def predict(image):
     image = torch.from_numpy(image)
     image = image.to(device)
 
-    out = model_load(image,times_in_attention)[-1]
+    out = model_load(image,times_in_attention,device)[-1]
 
     out = out.cpu().data
     out = out.numpy()
@@ -43,7 +43,7 @@ if __name__ == '__main__':
     args = get_args()
     args.input_dir = '/home/louis/Documents/git/DeRaindrop/data/test_a/data/'  # 带雨滴的图片的路径
     args.output_dir = '/home/louis/Documents/git/DeRaindrop/data/test_a/result/'  # 图片的路径
-    model_weights = '/home/louis/Documents/git/DeRaindrop/models/generator_1617187768.218444.pth.tar'
+    model_weights = '/home/louis/Documents/git/DeRaindrop/models/2_generator_1617244234.0307407.pth.tar'
     # device = 'cuda' if torch.cuda.is_available() else 'cpu'
     device = 'cpu'
     model_load = Generator().to(device)

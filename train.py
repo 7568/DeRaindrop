@@ -90,15 +90,6 @@ def loss_generator(generator_results, back_ground_truth, binary_mask):
         _pow = torch.tensor(math.pow(sida_in_attention, len(_attention) - i - 1)).to(device)
         l_att_a_m += _pow * mseloss(binary_mask, _attention[i])
 
-    # 计算公式6
-    # generator_output = generator_results_array[4]
-    lp_o_t = 0
-    # loss2 = nn.MSELoss()
-    vgg_to_gen = vgg16(generator_results[4])
-    vgg_to_gt = vgg16(prepare_img_to_tensor(back_ground_truth))
-    for i in range(len(vgg_to_gen)):
-        lp_o_t += mseloss(vgg_to_gen[i], vgg_to_gt[i])
-
     # 计算公式5
     # loss3 = nn.MSELoss()
     _s = [generator_results[1], generator_results[2], generator_results[4]]
@@ -111,10 +102,22 @@ def loss_generator(generator_results, back_ground_truth, binary_mask):
 
     # lm_s_t = torch.sum(_lamda * nn.MSELoss(_s, _t))
 
+    # 计算公式6
+    # generator_output = generator_results_array[4]
+    lp_o_t = 0
+    # loss2 = nn.MSELoss()
+    vgg_to_gen = vgg16(generator_results[4])
+    vgg_to_gt = vgg16(prepare_img_to_tensor(back_ground_truth))
+    for i in range(len(vgg_to_gen)):
+        lp_o_t += mseloss(vgg_to_gen[i], vgg_to_gt[i])
+    lp_o_t /=len(vgg_to_gen)
+
+
     # 计算公式7
     # LGAN(O) = log(1 - D(G(I)))
     # l_gan = nn.BCELoss(do_discriminator(generator_results[4]), back_ground_truth)
     l_g = l_att_a_m + lm_s_t + lp_o_t
+    # print('loss_generator : ',l_g)
     return l_g
 
 
@@ -169,6 +172,7 @@ def loss_adversarial(result, back_gt):
     l_o_r_an = mseloss(d_o[0], result[0][3]) + mseloss(d_r[0], zeros)
     ones = torch.ones(d_o[1].size(0)).to(device)
     loss2 = -torch.log(d_r[1][0])[0] - torch.log(ones - d_o[1][0])[0] + discriminative_loss_r * l_o_r_an
+    # print('loss_adversarial : ',loss2)
     return loss2
 
 
@@ -197,8 +201,8 @@ def train():
 
     for _e in range(epoch):
         for _i in range(num):  # 默认一个iteration只有一张图片
-            print('_i = ',_i)
-            print('Processing image: %s' % (input_list[_i]))
+            # print('_i = ', _i)
+            # print('Processing image: %s' % (input_list[_i]))
             _start = time.time()
             generator.zero_grad()
             img = cv2.imread(args.input_dir + input_list[_i])
@@ -214,7 +218,7 @@ def train():
             img_tensor = prepare_img_to_tensor(img)
 
             optimizer_g.zero_grad()
-            result = generator(img_tensor, times_in_attention,device)
+            result = generator(img_tensor, times_in_attention, device)
             loss1 = loss_generator(result, gt, binary_mask)
             d1 = discriminator(result[4])
             ones = torch.ones(d1[1].size(0)).to(device)
@@ -226,27 +230,33 @@ def train():
             optimizer_d.zero_grad()
             # d1 = discriminator(result[4])
             # torch.log(1 - d1)
-            result2 = generator(img_tensor, times_in_attention,device)
+            result2 = generator(img_tensor, times_in_attention, device)
 
             loss2 = loss_adversarial(result2, gt)
             # Backpropagation
             loss2.backward()
             optimizer_d.step()
-            print(time.time() - _start)
+            # print(time.time() - _start)
+            # if _i % 50 == 0:
+            #     print(generator.state_dict())
+
+        print(generator.state_dict())
+        torch.save({'state_dict': generator.state_dict()},
+                   f'/home/louis/Documents/git/DeRaindrop/models/{_e}_generator_{time.time()}.pth.tar')
+        torch.save({'state_dict': discriminator.state_dict()},
+                   f'/home/louis/Documents/git/DeRaindrop/models/{_e}_discriminator_{time.time()}.pth.tar')
 
     print("======finish!==========")
-    torch.save({'state_dict': generator.state_dict()}, f'/home/louis/Documents/git/DeRaindrop/models/generator_{time.time()}.pth.tar')
-    torch.save({'state_dict': discriminator.state_dict()}, f'/home/louis/Documents/git/DeRaindrop/models/discriminator_{time.time()}.pth.tar')
 
 
-            # result = np.array(result, dtype='uint8')
-            # cur_psnr = calc_psnr(result, gt)
-            # cur_ssim = calc_ssim(result, gt)
-            # print('PSNR is %.4f and SSIM is %.4f' % (cur_psnr, cur_ssim))
-            # cumulative_psnr += cur_psnr
-            # cumulative_ssim += cur_ssim
+    # result = np.array(result, dtype='uint8')
+    # cur_psnr = calc_psnr(result, gt)
+    # cur_ssim = calc_ssim(result, gt)
+    # print('PSNR is %.4f and SSIM is %.4f' % (cur_psnr, cur_ssim))
+    # cumulative_psnr += cur_psnr
+    # cumulative_ssim += cur_ssim
 
-        # print('In testing dataset, PSNR is %.4f and SSIM is %.4f' % (cumulative_psnr / num, cumulative_ssim / num))
+    # print('In testing dataset, PSNR is %.4f and SSIM is %.4f' % (cumulative_psnr / num, cumulative_ssim / num))
 
 
 if __name__ == '__main__':
