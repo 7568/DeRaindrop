@@ -41,9 +41,9 @@ def predict(image):
 
 if __name__ == '__main__':
     args = get_args()
-    args.input_dir = '/home/louis/Documents/git/DeRaindrop/data/test_a/data/'  # 带雨滴的图片的路径
-    args.output_dir = '/home/louis/Documents/git/DeRaindrop/data/test_a/result/'  # 图片的路径
-    model_weights = '/home/louis/Documents/git/DeRaindrop/models/2_generator_1617244234.0307407.pth.tar'
+    args.input_dir = './data/test_a/data/'  # 带雨滴的图片的路径
+    args.output_dir = './data/test_a/result/'  # 图片的路径
+    model_weights = './models/2_generator_1617244234.0307407.pth.tar'
     # device = 'cuda' if torch.cuda.is_available() else 'cpu'
     device = 'cpu'
     torch.device(device)
