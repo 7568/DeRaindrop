@@ -46,8 +46,9 @@ if __name__ == '__main__':
     model_weights = '/home/louis/Documents/git/DeRaindrop/models/2_generator_1617244234.0307407.pth.tar'
     # device = 'cuda' if torch.cuda.is_available() else 'cpu'
     device = 'cpu'
+    torch.device(device)
     model_load = Generator().to(device)
-    checkpoint = torch.load(model_weights)
+    checkpoint = torch.load(model_weights,map_location=device)
     model_load.load_state_dict(checkpoint['state_dict'])
 
     times_in_attention = 4  # attention中提取M的次数
