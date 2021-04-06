@@ -17,6 +17,7 @@ import torch.functional as nn
 # Metrics lib
 from models import *
 import time
+from metrics import calc_psnr, calc_ssim
 
 
 def get_args():
@@ -89,6 +90,7 @@ def loss_generator(generator_results, back_ground_truth, binary_mask):
     for i in range(len(_attention)):
         _pow = torch.tensor(math.pow(sida_in_attention, len(_attention) - i - 1)).to(device)
         l_att_a_m += _pow * mseloss(binary_mask, _attention[i])
+    l_att_a_m = torch.mean(l_att_a_m)
 
     # 计算公式5
     # loss3 = nn.MSELoss()
@@ -99,6 +101,7 @@ def loss_generator(generator_results, back_ground_truth, binary_mask):
     lm_s_t = 0
     for i in range(len(_s)):
         lm_s_t += _lamda[i] * mseloss(_s[i], _t[i])
+    lm_s_t = torch.mean(lm_s_t)
 
     # lm_s_t = torch.sum(_lamda * nn.MSELoss(_s, _t))
 
@@ -110,14 +113,15 @@ def loss_generator(generator_results, back_ground_truth, binary_mask):
     vgg_to_gt = vgg16(prepare_img_to_tensor(back_ground_truth))
     for i in range(len(vgg_to_gen)):
         lp_o_t += mseloss(vgg_to_gen[i], vgg_to_gt[i])
-    lp_o_t /=len(vgg_to_gen)
-
+    lp_o_t = torch.mean(lp_o_t)
 
     # 计算公式7
     # LGAN(O) = log(1 - D(G(I)))
     # l_gan = nn.BCELoss(do_discriminator(generator_results[4]), back_ground_truth)
     l_g = l_att_a_m + lm_s_t + lp_o_t
     # print('loss_generator : ',l_g)
+    if l_g < 0:
+        print(l_g)
     return l_g
 
 
@@ -170,9 +174,10 @@ def loss_adversarial(result, back_gt):
     d_r = discriminator(prepare_img_to_tensor(back_gt))
     zeros = torch.zeros(d_r[0].size(0), d_r[0].size(1), d_r[0].size(2), d_r[0].size(3)).to(device)
     l_o_r_an = mseloss(d_o[0], result[0][3]) + mseloss(d_r[0], zeros)
+    l_o_r_an = torch.mean(l_o_r_an)
     ones = torch.ones(d_o[1].size(0)).to(device)
-    loss2 = -torch.log(d_r[1][0])[0] - torch.log(ones - d_o[1][0])[0] + discriminative_loss_r * l_o_r_an
-    # print('loss_adversarial : ',loss2)
+    loss2 = -torch.log(d_r[1]) - torch.log(ones - d_o[1]) + discriminative_loss_r * l_o_r_an
+
     return loss2
 
 
@@ -189,20 +194,20 @@ def weights_init(m):
 def train():
     input_list = sorted(os.listdir(args.input_dir))
     gt_list = sorted(os.listdir(args.gt_dir))
-    num = len(input_list)
     cumulative_psnr = 0
     cumulative_ssim = 0
 
-    optimizer_g = torch.optim.Adam(generator.parameters(), lr=learning_rate, betas=(beta1, 0.999))
-    optimizer_d = torch.optim.Adam(discriminator.parameters(), lr=learning_rate, betas=(beta1, 0.999))
+    optimizer_g = torch.optim.Adam(generator.parameters(), lr=learning_rate)
+    optimizer_d = torch.optim.Adam(discriminator.parameters(), lr=learning_rate)
     generator.apply(weights_init)
     discriminator.apply(weights_init)
     criterion = nn.BCELoss()
 
     for _e in range(epoch):
-        for _i in range(num):  # 默认一个iteration只有一张图片
+
+        for _i in range(len(input_list)):  # 默认一个iteration只有一张图片
             # print('_i = ', _i)
-            # print('Processing image: %s' % (input_list[_i]))
+            print('Processing image: %s' % (input_list[_i]))
             _start = time.time()
             generator.zero_grad()
             img = cv2.imread(args.input_dir + input_list[_i])
@@ -219,6 +224,8 @@ def train():
 
             optimizer_g.zero_grad()
             result = generator(img_tensor, times_in_attention, device)
+            if _e == 16:
+                print(_e)
             loss1 = loss_generator(result, gt, binary_mask)
             d1 = discriminator(result[4])
             ones = torch.ones(d1[1].size(0)).to(device)
@@ -240,30 +247,30 @@ def train():
             # if _i % 50 == 0:
             #     print(generator.state_dict())
 
-        print(generator.state_dict())
-        torch.save({'state_dict': generator.state_dict()},
-                   f'/home/louis/Documents/git/DeRaindrop/models/{_e}_generator_{time.time()}.pth.tar')
-        torch.save({'state_dict': discriminator.state_dict()},
-                   f'/home/louis/Documents/git/DeRaindrop/models/{_e}_discriminator_{time.time()}.pth.tar')
+        if _e % 3 == 0:
+            print(generator.state_dict())
+            torch.save({'state_dict': generator.state_dict()},
+                       f'/home/louis/Documents/git/DeRaindrop/models/{_e}_generator_{time.time()}.pth.tar')
+            torch.save({'state_dict': discriminator.state_dict()},
+                       f'/home/louis/Documents/git/DeRaindrop/models/{_e}_discriminator_{time.time()}.pth.tar')
+
+        # result = np.array(result, dtype='uint8')
+        # cur_psnr = calc_psnr(result, gt)
+        # cur_ssim = calc_ssim(result, gt)
+        # print('PSNR is %.4f and SSIM is %.4f' % (cur_psnr, cur_ssim))
+        # cumulative_psnr += cur_psnr
+        # cumulative_ssim += cur_ssim
+        #
+        # print('In testing dataset, PSNR is %.4f and SSIM is %.4f' % (cumulative_psnr / _e, cumulative_ssim / _e))
 
     print("======finish!==========")
 
 
-    # result = np.array(result, dtype='uint8')
-    # cur_psnr = calc_psnr(result, gt)
-    # cur_ssim = calc_ssim(result, gt)
-    # print('PSNR is %.4f and SSIM is %.4f' % (cur_psnr, cur_ssim))
-    # cumulative_psnr += cur_psnr
-    # cumulative_ssim += cur_ssim
-
-    # print('In testing dataset, PSNR is %.4f and SSIM is %.4f' % (cumulative_psnr / num, cumulative_ssim / num))
-
-
 if __name__ == '__main__':
     args = get_args()
-    args.input_dir = '/home/louis/Documents/git/DeRaindrop/data/train/rain_image/'  # 带雨滴的图片的路径
-    args.gt_dir = '/home/louis/Documents/git/DeRaindrop/data/train/clean_image/'  # 干净的图片的路径
-    model_weights = '/home/louis/Documents/git/DeRaindrop/models/vgg16-397923af.pth'
+    args.input_dir = './data/train/rain_image/'  # 带雨滴的图片的路径
+    args.gt_dir = './data/train/clean_image/'  # 干净的图片的路径
+    model_weights = './models/vgg16-397923af.pth'
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     # device = 'cpu'
     generator = Generator().to(device)
