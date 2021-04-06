@@ -19,6 +19,8 @@ from models import *
 import time
 from metrics import calc_psnr, calc_ssim
 
+from torch.utils.tensorboard import SummaryWriter
+
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -192,15 +194,19 @@ def get_analysis(img_path, gt_path):
     # gt = cv2.imread(args.gt_dir + gt_list[_i])
 
     img_tensor = prepare_img_to_tensor(img)
-
-    result = generator(img_tensor, times_in_attention, device)
-    result = np.array(result, dtype='uint8')
-    cur_psnr = calc_psnr(result, gt)
-    cur_ssim = calc_ssim(result, gt)
+    with torch.no_grad():
+        out = generator(img_tensor, times_in_attention, device)[-1]
+        out = out.cpu().data
+        out = out.numpy()
+        out = out.transpose((0, 2, 3, 1))
+        out = out[0, :, :, :] * 255.
+        out = np.array(out, dtype='uint8')
+        cur_psnr = calc_psnr(out, gt)
+        cur_ssim = calc_ssim(out, gt)
     return cur_psnr, cur_ssim
 
 
-def train():
+def write_tensorboard(args):
     input_list = sorted(os.listdir(args.input_dir))
     gt_list = sorted(os.listdir(args.gt_dir))
     test_input_list = sorted(os.listdir(args.test_input_list))
@@ -209,6 +215,31 @@ def train():
     test_cumulative_psnr = 0
     train_cumulative_ssim = 0
     test_cumulative_ssim = 0
+    # 从训练集和测试集中分别随机抽取10张图片进行结果分析
+    sample_train = torch.randint(0, len(input_list), (10,))
+    sample_test = torch.randint(0, len(test_input_list), (10,))
+
+    for _i in sample_train:
+        # 计算训练集结果
+        train_cur_psnr, train_cur_ssim = get_analysis(args.input_dir + input_list[_i], args.gt_dir + gt_list[_i])
+        train_cumulative_psnr += train_cur_psnr
+        train_cumulative_ssim += train_cur_ssim
+
+    for _i in sample_test:
+        # 计算训练集结果
+        test_cur_psnr, test_cur_ssim = get_analysis(args.test_input_list + test_input_list[_i],
+                                                    args.test_gt_list + test_gt_list[_i])
+        test_cumulative_psnr += test_cur_psnr
+        test_cumulative_ssim += test_cur_ssim
+
+    writer.add_scalars('PSNR', {'train_PSNR': train_cumulative_psnr / 10, 'test_PSNR': test_cumulative_psnr / 10})
+    writer.add_scalars('SSIM', {'train_SSIM': train_cumulative_ssim / 10, 'test_SSIM': test_cumulative_ssim / 10})
+    # print('In testing dataset, PSNR is %.4f and SSIM is %.4f' % (cumulative_psnr / _e, cumulative_ssim / _e))
+
+
+def train():
+    input_list = sorted(os.listdir(args.input_dir))
+    gt_list = sorted(os.listdir(args.gt_dir))
 
     optimizer_g = torch.optim.Adam(generator.parameters(), lr=learning_rate)
     optimizer_d = torch.optim.Adam(discriminator.parameters(), lr=learning_rate)
@@ -252,30 +283,12 @@ def train():
             loss2.backward()
             optimizer_d.step()
 
-        print(generator.state_dict())
+        # print(generator.state_dict())
+        write_tensorboard(args)
         torch.save({'state_dict': generator.state_dict()},
                    f'/home/louis/Documents/git/DeRaindrop/models/{_e}_generator_{time.time()}.pth.tar')
         torch.save({'state_dict': discriminator.state_dict()},
                    f'/home/louis/Documents/git/DeRaindrop/models/{_e}_discriminator_{time.time()}.pth.tar')
-
-        # 从训练集和测试集中分别随机抽取10张图片进行结果分析
-        sample_train = torch.randint(0, len(input_list), (10,))
-        sample_test = torch.randint(0, len(test_input_list), (10,))
-
-        for _i in sample_train:
-            # 计算训练集结果
-            train_cur_psnr, train_cur_ssim = get_analysis(args.input_dir + input_list[_i], args.gt_dir + gt_list[_i])
-            train_cumulative_psnr += train_cur_psnr
-            train_cumulative_ssim += train_cur_ssim
-            # 计算训练集结果
-            test_cur_psnr, test_cur_ssim = get_analysis(args.test_input_list + test_input_list[_i],
-                                              args.test_gt_list + test_gt_list[_i])
-            test_cumulative_psnr += test_cur_psnr
-            test_cumulative_ssim += test_cur_ssim
-
-        # print('In testing dataset, PSNR is %.4f and SSIM is %.4f' % (cumulative_psnr / _e, cumulative_ssim / _e))
-
-
 
     print("======finish!==========")
 
@@ -301,5 +314,5 @@ if __name__ == '__main__':
     times_in_attention = 4  # attention中提取M的次数
     lamda_in_autoencoder = [0.6, 0.8, 1.0]
     discriminative_loss_r = 0.05
-
+    writer = SummaryWriter()
     train()
