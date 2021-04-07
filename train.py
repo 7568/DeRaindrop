@@ -192,6 +192,9 @@ def get_analysis(img_path, gt_path):
     # img = cv2.imread(args.input_dir + input_list[_i])
     gt = cv2.imread(gt_path)
     # gt = cv2.imread(args.gt_dir + gt_list[_i])
+    dsize = (720, 480)
+    img = cv2.resize(img, dsize)
+    gt = cv2.resize(gt, dsize)
 
     img_tensor = prepare_img_to_tensor(img)
     with torch.no_grad():
@@ -206,7 +209,7 @@ def get_analysis(img_path, gt_path):
     return cur_psnr, cur_ssim
 
 
-def write_tensorboard(args):
+def write_tensorboard(args, e):
     input_list = sorted(os.listdir(args.input_dir))
     gt_list = sorted(os.listdir(args.gt_dir))
     test_input_list = sorted(os.listdir(args.test_input_list))
@@ -232,8 +235,8 @@ def write_tensorboard(args):
         test_cumulative_psnr += test_cur_psnr
         test_cumulative_ssim += test_cur_ssim
 
-    writer.add_scalars('PSNR', {'train_PSNR': train_cumulative_psnr / 10, 'test_PSNR': test_cumulative_psnr / 10})
-    writer.add_scalars('SSIM', {'train_SSIM': train_cumulative_ssim / 10, 'test_SSIM': test_cumulative_ssim / 10})
+    writer.add_scalars('PSNR', {'train_PSNR': train_cumulative_psnr / 10, 'test_PSNR': test_cumulative_psnr / 10}, e+1)
+    writer.add_scalars('SSIM', {'train_SSIM': train_cumulative_ssim / 10, 'test_SSIM': test_cumulative_ssim / 10}, e+1)
     # print('In testing dataset, PSNR is %.4f and SSIM is %.4f' % (cumulative_psnr / _e, cumulative_ssim / _e))
 
 
@@ -252,7 +255,6 @@ def train():
             # print('_i = ', _i)
             print('Processing image: %s' % (input_list[_i]))
             _start = time.time()
-            generator.zero_grad()
             img = cv2.imread(args.input_dir + input_list[_i])
             gt = cv2.imread(args.gt_dir + gt_list[_i])
 
@@ -284,7 +286,7 @@ def train():
             optimizer_d.step()
 
         # print(generator.state_dict())
-        write_tensorboard(args)
+        write_tensorboard(args, _e)
         torch.save({'state_dict': generator.state_dict()},
                    f'/home/louis/Documents/git/DeRaindrop/models/{_e}_generator_{time.time()}.pth.tar')
         torch.save({'state_dict': discriminator.state_dict()},
@@ -297,8 +299,8 @@ if __name__ == '__main__':
     args = get_args()
     args.input_dir = './data/train/rain_image/'  # 带雨滴的图片的路径
     args.gt_dir = './data/train/clean_image/'  # 干净的图片的路径
-    args.test_gt_list = './data/train/clean_image/'  # 测试集带雨滴的图片的路径
-    args.test_input_list = './data/train/clean_image/'  # 测试集干净的图片的路径
+    args.test_gt_list = './data/test_a/gt/'  # 测试集带雨滴的图片的路径
+    args.test_input_list = './data/test_a/data/'  # 测试集干净的图片的路径
     model_weights = './models/vgg16-397923af.pth'
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     # device = 'cpu'

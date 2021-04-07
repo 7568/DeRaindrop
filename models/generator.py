@@ -196,6 +196,8 @@ class Generator(nn.Module):
         x = self.conv8(x)
         frame1 = self.outframe1(x)
         x = self.deconv1(x)
+        if x.shape != res2.shape:
+            print('!ok')
         x = x + res2
         x = self.conv9(x)
         frame2 = self.outframe2(x)
