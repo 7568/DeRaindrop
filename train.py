@@ -116,8 +116,6 @@ def loss_generator(generator_results, back_ground_truth, binary_mask):
     # 计算公式7
     # LGAN(O) = log(1 - D(G(I)))
     l_g = l_att_a_m + lm_s_t + lp_o_t
-    if l_g < 0:
-        print(l_g)
     return l_g
 
 
@@ -235,8 +233,10 @@ def write_tensorboard(args, e):
         test_cumulative_psnr += test_cur_psnr
         test_cumulative_ssim += test_cur_ssim
 
-    writer.add_scalars('PSNR', {'train_PSNR': train_cumulative_psnr / 10, 'test_PSNR': test_cumulative_psnr / 10}, e+1)
-    writer.add_scalars('SSIM', {'train_SSIM': train_cumulative_ssim / 10, 'test_SSIM': test_cumulative_ssim / 10}, e+1)
+    writer.add_scalars('PSNR', {'train_PSNR': train_cumulative_psnr / 10, 'test_PSNR': test_cumulative_psnr / 10},
+                       e + 1)
+    writer.add_scalars('SSIM', {'train_SSIM': train_cumulative_ssim / 10, 'test_SSIM': test_cumulative_ssim / 10},
+                       e + 1)
     # print('In testing dataset, PSNR is %.4f and SSIM is %.4f' % (cumulative_psnr / _e, cumulative_ssim / _e))
 
 
@@ -249,7 +249,7 @@ def train():
     generator.apply(weights_init)
     discriminator.apply(weights_init)
 
-    for _e in range(epoch):
+    for _e in range(previous_epoch+1,epoch):
 
         for _i in range(len(input_list)):  # 默认一个iteration只有一张图片
             # print('_i = ', _i)
@@ -301,11 +301,20 @@ if __name__ == '__main__':
     args.gt_dir = './data/train/clean_image/'  # 干净的图片的路径
     args.test_gt_list = './data/test_a/gt/'  # 测试集带雨滴的图片的路径
     args.test_input_list = './data/test_a/data/'  # 测试集干净的图片的路径
+    previous_generator_model_path = './models/41_generator_1617845629.0731194.pth.tar'
+    previous_discriminator_model_path = './models/41_discriminator_1617845629.0942993.pth.tar'
+    previous_epoch=41
     model_weights = './models/vgg16-397923af.pth'
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     # device = 'cpu'
     generator = Generator().to(device)
+    if len(previous_generator_model_path) != 0:
+        previous_generator_model = torch.load(previous_generator_model_path)
+        generator.load_state_dict(previous_generator_model['state_dict'])
     discriminator = Discriminator().to(device)
+    if len(previous_discriminator_model_path) != 0:
+        previous_discriminator_model = torch.load(previous_discriminator_model_path)
+        discriminator.load_state_dict(previous_discriminator_model['state_dict'])
     vgg16 = Vgg(vgg_init(device, model_weights))
 
     print(vgg16)
