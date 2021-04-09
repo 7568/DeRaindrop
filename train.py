@@ -294,11 +294,11 @@ def train():
         # print(generator.state_dict())
         write_tensorboard(args, _e)
         generator_checkpoint = {'epoch': _e, 'model_state_dict': generator.state_dict(),
-                                'optimizer-state-dict': optimizer_g.state_dict(), 'loss': loss1}
+                                'optimizer-state-dict': optimizer_g.state_dict()}
         torch.save(generator_checkpoint,
                    f'/home/louis/Documents/git/DeRaindrop/trains_out/{_e}_generator.pth.tar')
         adversarial_checkpoint = {'epoch': _e, 'model_state_dict': discriminator.state_dict(),
-                                  'optimizer-state-dict': optimizer_d.state_dict(), 'loss': loss2}
+                                  'optimizer-state-dict': optimizer_d.state_dict()}
         torch.save(adversarial_checkpoint,
                    f'/home/louis/Documents/git/DeRaindrop/trains_out/{_e}_discriminator.pth.tar')
 
