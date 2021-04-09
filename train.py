@@ -242,6 +242,8 @@ def write_tensorboard(args, e):
 
 def train():
     if previous_epoch != 0:  # load previous model parameters
+        previous_generator_model_path = f'./trains_out/{previous_epoch}_generator.pth.tar'
+        previous_discriminator_model_path = f'./trains_out/{previous_epoch}_discriminator.pth.tar'
         previous_generator_model = torch.load(previous_generator_model_path)
         generator.load_state_dict(previous_generator_model['model_state_dict'])
         optimizer_g.load_state_dict(previous_generator_model['optimizer-state-dict'])
@@ -312,8 +314,7 @@ if __name__ == '__main__':
     args.test_gt_list = './data/test_a/gt/'  # 测试集带雨滴的图片的路径
     args.test_input_list = './data/test_a/data/'  # 测试集干净的图片的路径
     previous_epoch = 42
-    previous_generator_model_path = f'./trains_out/{previous_epoch}_generator.pth.tar'
-    previous_discriminator_model_path = f'./trains_out/{previous_epoch}_discriminator.pth.tar'
+
     model_weights = './models/vgg16-397923af.pth'
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     # device = 'cpu'
