@@ -241,15 +241,21 @@ def write_tensorboard(args, e):
 
 
 def train():
-    input_list = sorted(os.listdir(args.input_dir))
-    gt_list = sorted(os.listdir(args.gt_dir))
+    if previous_epoch != 0:  # load previous model parameters
+        previous_generator_model = torch.load(previous_generator_model_path)
+        generator.load_state_dict(previous_generator_model['model_state_dict'])
+        optimizer_g.load_state_dict(previous_generator_model['optimizer-state-dict'])
+        previous_discriminator_model = torch.load(previous_discriminator_model_path)
+        discriminator.load_state_dict(previous_discriminator_model['model_state_dict'])
+        optimizer_d.load_state_dict(previous_discriminator_model['optimizer-state-dict'])
 
-    optimizer_g = torch.optim.Adam(generator.parameters(), lr=learning_rate)
-    optimizer_d = torch.optim.Adam(discriminator.parameters(), lr=learning_rate)
     generator.apply(weights_init)
     discriminator.apply(weights_init)
 
-    for _e in range(previous_epoch+1,epoch):
+    input_list = sorted(os.listdir(args.input_dir))
+    gt_list = sorted(os.listdir(args.gt_dir))
+
+    for _e in range(previous_epoch + 1, epoch):
 
         for _i in range(len(input_list)):  # 默认一个iteration只有一张图片
             # print('_i = ', _i)
@@ -267,30 +273,34 @@ def train():
             # gt = align_to_four(gt)
             img_tensor = prepare_img_to_tensor(img)
 
-            optimizer_g.zero_grad()
             result = generator(img_tensor, times_in_attention, device)
             loss1 = loss_generator(result, gt, binary_mask)
             d1 = discriminator(result[4])
             ones = torch.ones(d1[1].size(0)).to(device)
             loss1 += torch.log(ones - d1[1][0])[0]
+            optimizer_g.zero_grad()
             # Backpropagation
             loss1.backward()
             optimizer_g.step()
 
-            optimizer_d.zero_grad()
             result2 = generator(img_tensor, times_in_attention, device)
 
             loss2 = loss_adversarial(result2, gt)
+            optimizer_d.zero_grad()
             # Backpropagation
             loss2.backward()
             optimizer_d.step()
 
         # print(generator.state_dict())
         write_tensorboard(args, _e)
-        torch.save({'state_dict': generator.state_dict()},
-                   f'/home/louis/Documents/git/DeRaindrop/models/{_e}_generator_{time.time()}.pth.tar')
-        torch.save({'state_dict': discriminator.state_dict()},
-                   f'/home/louis/Documents/git/DeRaindrop/models/{_e}_discriminator_{time.time()}.pth.tar')
+        generator_checkpoint = {'epoch': _e, 'model_state_dict': generator.state_dict(),
+                                'optimizer-state-dict': optimizer_g.state_dict(), 'loss': loss1}
+        torch.save(generator_checkpoint,
+                   f'/home/louis/Documents/git/DeRaindrop/trains_out/{_e}_generator.pth.tar')
+        adversarial_checkpoint = {'epoch': _e, 'model_state_dict': discriminator.state_dict(),
+                                  'optimizer-state-dict': optimizer_d.state_dict(), 'loss': loss2}
+        torch.save(adversarial_checkpoint,
+                   f'/home/louis/Documents/git/DeRaindrop/trains_out/{_e}_discriminator.pth.tar')
 
     print("======finish!==========")
 
@@ -301,23 +311,13 @@ if __name__ == '__main__':
     args.gt_dir = './data/train/clean_image/'  # 干净的图片的路径
     args.test_gt_list = './data/test_a/gt/'  # 测试集带雨滴的图片的路径
     args.test_input_list = './data/test_a/data/'  # 测试集干净的图片的路径
-    previous_generator_model_path = './models/41_generator_1617845629.0731194.pth.tar'
-    previous_discriminator_model_path = './models/41_discriminator_1617845629.0942993.pth.tar'
-    previous_epoch=41
+    previous_epoch = 42
+    previous_generator_model_path = f'./trains_out/{previous_epoch}_generator.pth.tar'
+    previous_discriminator_model_path = f'./trains_out/{previous_epoch}_discriminator.pth.tar'
     model_weights = './models/vgg16-397923af.pth'
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     # device = 'cpu'
-    generator = Generator().to(device)
-    if len(previous_generator_model_path) != 0:
-        previous_generator_model = torch.load(previous_generator_model_path)
-        generator.load_state_dict(previous_generator_model['state_dict'])
-    discriminator = Discriminator().to(device)
-    if len(previous_discriminator_model_path) != 0:
-        previous_discriminator_model = torch.load(previous_discriminator_model_path)
-        discriminator.load_state_dict(previous_discriminator_model['state_dict'])
-    vgg16 = Vgg(vgg_init(device, model_weights))
 
-    print(vgg16)
     epoch = 100
     learning_rate = 0.0002
     beta1 = 0.5
@@ -325,5 +325,12 @@ if __name__ == '__main__':
     times_in_attention = 4  # attention中提取M的次数
     lamda_in_autoencoder = [0.6, 0.8, 1.0]
     discriminative_loss_r = 0.05
+
+    generator = Generator().to(device)
+    discriminator = Discriminator().to(device)
+    vgg16 = Vgg(vgg_init(device, model_weights))
+    optimizer_g = torch.optim.Adam(generator.parameters(), lr=learning_rate)
+    optimizer_d = torch.optim.Adam(discriminator.parameters(), lr=learning_rate)
+
     writer = SummaryWriter()
     train()
