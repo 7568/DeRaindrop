@@ -43,13 +43,14 @@ if __name__ == '__main__':
     args = get_args()
     args.input_dir = './data/test_a/data/'  # 带雨滴的图片的路径
     args.output_dir = './data/test_a/result/'  # 图片的路径
-    model_weights = './models/2_generator_1617244234.0307407.pth.tar'
+    model_weights = './trains_out/65_generator.pth.tar'
     # device = 'cuda' if torch.cuda.is_available() else 'cpu'
     device = 'cpu'
     torch.device(device)
     model_load = Generator().to(device)
     checkpoint = torch.load(model_weights,map_location=device)
-    model_load.load_state_dict(checkpoint['state_dict'])
+    model_load.load_state_dict(checkpoint['model_state_dict'])
+    model_load.eval()
 
     times_in_attention = 4  # attention中提取M的次数
 
